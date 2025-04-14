@@ -103,12 +103,15 @@ def generate_padded_pdf(input_file: str, padding: str) -> str:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Arrange PDF pages for booklet printing. Pads to a multiple of 4 pages if needed."
+    )
     parser.add_argument("file", type=str)
     parser.add_argument(
         "--padding",
-        choices=["none", "end", "before-end"],
-        default="none",
-        help="Pad with blank pages: No padding, at the end, or before the end",
+        choices=["end", "before-end"],
+        default="before-end",
+        help="Where to pad: at or immediately before the end of the document",
     )
     args = parser.parse_args()
 
