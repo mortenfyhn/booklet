@@ -12,7 +12,7 @@ Shoutout to https://github.com/georgjaehnig/booklet-page-calculator for giving m
 ## Usage
 
 ```sh
-./booklet.py input.pdf output.pdf
+./booklet.py input.pdf
 ```
 
 If you want more info:
