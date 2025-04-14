@@ -15,7 +15,7 @@ Shoutouts to
 ## Usage
 
 ```sh
-./booklet.py input.pdf
+./booklet.py input.pdf output.pdf
 ```
 
 If you want more info:

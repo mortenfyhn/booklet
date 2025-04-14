@@ -6,28 +6,45 @@ import subprocess
 import tempfile
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Arrange PDF pages for booklet printing. Pads to a multiple of 4 pages if needed."
+    )
+
+    parser.add_argument("input", type=str, help="Input PDF file")
+    parser.add_argument("output", type=str, help="Output PDF file")
+    parser.add_argument(
+        "--padding",
+        choices=["end", "before-end"],
+        default="before-end",
+        help="Where to pad: at or immediately before the end of the document",
+    )
+
+    return parser.parse_args()
+
+
 class BookletError(Exception):
     pass
 
 
-def reorder(page_count: int) -> list[int]:
+def compute_booklet_order(page_count: int) -> list[int]:
     """
     Compute correct page order for booklet printing.
 
-    >>> reorder(0)
+    >>> compute_booklet_order(0)
     Traceback (most recent call last):
         ...
     booklet.BookletError: Page count (0) must be positive
 
-    >>> reorder(3)
+    >>> compute_booklet_order(3)
     Traceback (most recent call last):
         ...
     booklet.BookletError: Page count (3) must be a multiple of 4
 
-    >>> reorder(8)
+    >>> compute_booklet_order(8)
     [8, 1, 2, 7, 6, 3, 4, 5]
 
-    >>> reorder(16)
+    >>> compute_booklet_order(16)
     [16, 1, 2, 15, 14, 3, 4, 13, 12, 5, 6, 11, 10, 7, 8, 9]
     """
 
@@ -45,82 +62,58 @@ def reorder(page_count: int) -> list[int]:
     return booklet_page_order
 
 
-def get_page_count(file: str) -> int:
-    output = subprocess.check_output(["qpdf", "--show-npages", file], text=True)
+def get_page_count(pdf: str) -> int:
+    output = subprocess.check_output(["qpdf", "--show-npages", pdf], text=True)
     return int(output.strip())
 
 
-def generate_booklet_pdf(file: str, page_order: list[int]) -> str:
-    # TODO describe
-    # may throw subprocess.CalledProcessError
-
+def generate_booklet_pdf(
+    input_pdf: str, page_order: list[int], output_pdf: str
+) -> None:
     # QPDF requires a comma separated page list like "4,1,2,3"
-    page_order_string = ",".join(map(str, page_order))
-
-    output_filename = "output.pdf"
+    page_order_command = ",".join(map(str, page_order))
 
     subprocess.run(
-        ["qpdf", file, "--pages", ".", page_order_string, "--", output_filename],
+        ["qpdf", input_pdf, "--pages", ".", page_order_command, "--", output_pdf],
         check=True,
     )
 
-    return output_filename
 
-
-def generate_padded_pdf(input_file: str, padding: str) -> str:
-    page_count = get_page_count(input_file)
+def generate_padded_pdf(input_pdf: str, padding: str) -> str:
+    page_count = get_page_count(input_pdf)
     padding_count = (-page_count) % 4
 
     if padding_count == 0:
-        return input_file
+        return input_pdf
 
-    if padding == "none":
-        return input_file
-
-    command = ["qpdf", input_file, "--pages"]
-    blank_page_file = "blank-a5.pdf"
+    command = ["qpdf", input_pdf, "--pages"]
+    padding_pdf = "blank-a5.pdf"
     padding_command = ",".join(["1"] * padding_count)
 
     if padding == "end":
-        # Add entire input file, then the blank pages.
-        command += [".", "1-z", blank_page_file, padding_command]
+        # Add entire input file, then the padding.
+        command += [".", "1-z", padding_pdf, padding_command]
     elif padding == "before-end":
-        # Add input file except last page, then blank pages, then the last page.
-        command += [".", "1-r2", blank_page_file, padding_command, ".", "z"]
+        # Add entire input file except last page, then padding, then the last page.
+        command += [".", "1-r2", padding_pdf, padding_command, ".", "z"]
     else:
-        raise BookletError("invalid option todo ")
+        raise BookletError(f"Invalid padding option: {padding}")
 
     padded_pdf = tempfile.NamedTemporaryFile().name
     command += ["--", padded_pdf]
-
-    subprocess.run(
-        command,
-        check=True,
-    )
-
+    subprocess.run(command, check=True)
     return padded_pdf
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser = argparse.ArgumentParser(
-        description="Arrange PDF pages for booklet printing. Pads to a multiple of 4 pages if needed."
-    )
-    parser.add_argument("file", type=str)
-    parser.add_argument(
-        "--padding",
-        choices=["end", "before-end"],
-        default="before-end",
-        help="Where to pad: at or immediately before the end of the document",
-    )
-    args = parser.parse_args()
+    args = parse_args()
 
     try:
-        padded_pdf = generate_padded_pdf(args.file, args.padding)
+        padded_pdf = generate_padded_pdf(args.input, args.padding)
         page_count = get_page_count(padded_pdf)
-        page_order = reorder(page_count)
-        output_filename = generate_booklet_pdf(padded_pdf, page_order)
-        print(f"Success! Output file generated: {output_filename}")
+        page_order = compute_booklet_order(page_count)
+        generate_booklet_pdf(padded_pdf, page_order, args.output)
+        print(f"Success! Output file generated: {args.output}")
 
     except (BookletError, subprocess.CalledProcessError) as e:
         print(f"Error: {e}")
