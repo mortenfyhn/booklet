@@ -19,4 +19,4 @@ blocks:
             # Run unit tests
             - python3 -m doctest booklet.py --verbose
             # Make sure it actually runs
-            - ./booklet.py blank-a5.pdf --padding=end
+            - ./booklet.py blank-a5.pdf output.pdf --padding=end
