@@ -3,6 +3,7 @@
 import argparse
 import doctest
 import subprocess
+import tempfile
 
 
 class BookletError(Exception):
@@ -65,89 +66,57 @@ def generate_booklet_pdf(file: str, page_order: list[int]) -> str:
 
     return output_filename
 
-def generate_padded_pdf(file: str, insert_blank_pages: str) -> str:
 
-    page_count = get_page_count(file)
-
+def generate_padded_pdf(input_file: str, padding: str) -> str:
+    page_count = get_page_count(input_file)
     padding_count = (-page_count) % 4
-    padding=",".join(["1"] * padding_count)
-
-    blank_page_file="blank-a5.pdf"
-    padded_pdf="padded.pdf"
-
-    # adjust 1-r2
-    # adjust number of pages
-
-
-    # none -> just return input
-    # last -> first = "1-z", last = "" (try to get nothing)
-    # before-last -> first = "1-r2", last = "z"
-
-    # maybe need to just build the array instead of defining strings
 
     if padding_count == 0:
-        return file
+        return input_file
 
-    if insert_blank_pages == "none":
-        return file
+    if padding == "none":
+        return input_file
 
-    command = ["qpdf", file, "--pages"]
+    command = ["qpdf", input_file, "--pages"]
+    blank_page_file = "blank-a5.pdf"
+    padding_command = ",".join(["1"] * padding_count)
 
-    if insert_blank_pages == "last":
+    if padding == "end":
         # Add entire input file, then the blank pages.
-        command += [".", "1-z", blank_page_file, padding]
-    elif insert_blank_pages == "before-last":
+        command += [".", "1-z", blank_page_file, padding_command]
+    elif padding == "before-end":
         # Add input file except last page, then blank pages, then the last page.
-        command += [".", "1-r2", blank_page_file, padding, ".", "z"]
+        command += [".", "1-r2", blank_page_file, padding_command, ".", "z"]
     else:
         raise BookletError("invalid option todo ")
 
+    padded_pdf = tempfile.NamedTemporaryFile().name
     command += ["--", padded_pdf]
 
-
-    subprocess.run(command,
+    subprocess.run(
+        command,
         check=True,
     )
 
     return padded_pdf
 
 
-
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--run-tests", action="store_true")
-    parser.add_argument(
-        "--insert-blank-pages",
-        choices=["none", "last", "before-last"],
-        default="none",
-        help="Insert blank pages to pad to multiple of 4",
-    )
     parser.add_argument("file", type=str)
+    parser.add_argument(
+        "--padding",
+        choices=["none", "end", "before-end"],
+        default="none",
+        help="Pad with blank pages: No padding, at the end, or before the end",
+    )
     args = parser.parse_args()
 
     try:
-
-        # pad with blank pages (to guarantee x4)
-        # compute new ordering
-        # generate booklet order pdf
-
-        # page_count = get_page_count(file)
-
-        padded_pdf = generate_padded_pdf(args.file, args.insert_blank_pages)
-
-
-
+        padded_pdf = generate_padded_pdf(args.file, args.padding)
         page_count = get_page_count(padded_pdf)
         page_order = reorder(page_count)
-
-
-
         output_filename = generate_booklet_pdf(padded_pdf, page_order)
-
-
-
         print(f"Success! Output file generated: {output_filename}")
 
     except (BookletError, subprocess.CalledProcessError) as e:
