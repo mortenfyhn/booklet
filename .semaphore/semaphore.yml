@@ -1,13 +1,22 @@
 version: v1.0
-name: Initial Pipeline
+name: Pipeline
 agent:
   machine:
     type: f1-standard-2
     os_image: ubuntu2204
 blocks:
-  - name: 'Block #1'
+  - name: 'Run checks'
     task:
       jobs:
-        - name: 'Job #1'
+        - name: 'Run checks'
           commands:
+            # Setup
             - checkout
+            - sudo apt install -y black qpdf
+            # Check Python formatting
+            - black --version
+            - black --check .
+            # Run unit tests
+            - python3 -m doctest booklet.py --verbose
+            # Make sure it actually runs
+            - ./booklet.py blank-a5.pdf --padding=end
